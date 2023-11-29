@@ -89,7 +89,7 @@ def divide_task(task):
 if __name__ == '__main__':
     num_processors = multiprocessing.cpu_count()
     pool = multiprocessing.Pool(processes=num_processors)
-    tasks = range(1000)
+    tasks = range(40)
     segment_execution_rates = [[0.8, 0.8, 0.6], [0.9, 0.7], [1.0]]  # نرخ اجرای بخش‌ها برای وظایف همزمان
     schedule_sequential_tasks(tasks)  # اجرای وظایف ترتیبی
     schedule_parallel_tasks(tasks, segment_execution_rates)  # اجرای وظایف همزمان
