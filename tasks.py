@@ -5,75 +5,6 @@ import numpy as np
 
 M = 8
 
-
-def create_tasks_(dataSize=100):
-    SubTasks = pd.DataFrame(columns=["taskID", "SubTaskID", "duration", "parentId", 'Li'])
-
-    for i in range(dataSize):
-        subtasksNumber = int(random.randint(4, 10))
-        # parent = int(random.randint(1, subtasks))
-        for j in range(subtasksNumber):
-            duration = random.randint(10, 2000)
-            # parent = int(random.randint(-1, j - 1))
-            # parentId = -1 if parent == -1 else i * 10 + parent
-            parentId = ''
-            parentsCount = random.randint(0, j + 3)
-            if (parentsCount == 0 or parentsCount >= j): parentId = '-1,'
-            if (parentId != '-1,'):
-                parentsCount = parentsCount if parentsCount < j else random.randint(0, j)
-                for np in range(parentsCount):
-                    ids = SubTasks.loc[SubTasks['taskID'] == i]['SubTaskID'].sample().item()
-                    # ids = random.choice(SubTasks.loc[SubTasks['taskID'] == i]['SubTaskID'])
-                    parentId += str(ids) + ','
-
-            row = {"taskID": i, "SubTaskID": i * 10 + j, "duration": duration, "parentId": parentId, 'Li': -1}
-
-            r = pd.DataFrame(row, index=[0])
-
-            SumDurationRow = 0
-            while True:
-                r2 = r.iloc[0]
-                l = -2
-                for ri in range(len(r)):
-                    try:
-                        if l < int(r.loc[ri]['Li']):
-                            l = int(r.loc[ri]['Li'])
-                            r2 = dict(r.loc[ri])
-                    except:
-                        pass
-                r = r2
-
-                print(r)
-                p = r['parentId'].split(',')
-                print(p)
-                p = list(set([int(x) for x in p if x != ""]))
-
-                SumDurationRow = SumDurationRow + int(r['duration'])
-                if len(p) == 1 and int(p[0]) == -1:
-                    row['Li'] = int(SumDurationRow)
-                    break
-
-                r = SubTasks.loc[SubTasks['SubTaskID'].isin(p)]
-
-            SubTasks = SubTasks._append(row, ignore_index=True)
-
-            # for l in range(i*10,i*10+j):
-            #     SubTasks.loc[SubTasks['SubTaskID'] == l]
-
-    tasks = pd.DataFrame(columns=['TaskID', "c", "L", "T", "D"])
-    for i in range(dataSize):
-        lst = SubTasks.loc[SubTasks['taskID'] == i]
-        Ci = int(sum(lst.duration))
-        Li = int(max(lst.Li))
-        Ti = Di = int(random.randint(Li, Li + 2000))
-        Ui = Ci / Di
-        Ni = int(len(lst))
-        row = {'TaskID': int(i), "c": Ci, 'L': Li, 'T': Ti, 'D': Di, 'U': Ui, 'N': Ni}
-        tasks = tasks._append(row, ignore_index=True)
-
-    return tasks, SubTasks
-
-
 def create_tasks(dataSize=100, maxSubtaskSize=20):
     SubTasks = pd.DataFrame(
         columns=["taskID", "SubTaskID", "SubTaskRealID", "duration", "parentId", 'Li', 'startTime', 'endTime'])
@@ -205,7 +136,7 @@ def exe_DAGFluid(tasks):
             elif one_count == len(HOrL):
                 # نرخ اجرای سگمنت ها وقتی همه سنگین باشند
                 for i in range(len(Mij)):
-                    lst += str((task.c / (task.T * Mij[i]))) + ','
+                    lst += str((task.c / (task.D * Mij[i]))) + ','
 
             # اگر سگمنت ها سبک و سنگین بود
             else:
@@ -286,7 +217,7 @@ def Namayesh_dag(SubTasks, Tasks):
     plt.show()
 
 
-tasks, subTasks = create_tasks(10)
+tasks, subTasks = create_tasks(100)
 
 tasks = create_segments(tasks, subTasks)
 
