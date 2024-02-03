@@ -3,6 +3,8 @@ import pandas as pd
 import random
 import numpy as np
 
+M = 8
+
 
 def create_tasks_(dataSize=100):
     SubTasks = pd.DataFrame(columns=["taskID", "SubTaskID", "duration", "parentId", 'Li'])
@@ -72,7 +74,7 @@ def create_tasks_(dataSize=100):
     return tasks, SubTasks
 
 
-def create_tasks(dataSize=100, maxSubtaskSize=20, m=8):
+def create_tasks(dataSize=100, maxSubtaskSize=20):
     SubTasks = pd.DataFrame(
         columns=["taskID", "SubTaskID", "SubTaskRealID", "duration", "parentId", 'Li', 'startTime', 'endTime'])
 
@@ -104,7 +106,7 @@ def create_tasks(dataSize=100, maxSubtaskSize=20, m=8):
         Ui = float(Ci) / float(Ti)
         gamma_value = np.random.gamma(2, 1)
         DL = Li + Ci + 0.5 * Ui * (1 + 0.25 * gamma_value)
-        al = Ci / (Ti - (m / (m + 1) * Li))
+        al = Ci / (Ti - (M / (M + 1) * Li))
         row = {'TaskID': int(i), "c": Ci, 'L': Li, 'T': Ti, 'D': Di, 'U': Ui, 'DeadLine': DL, 'alpha': al}
         tasks = tasks._append(row, ignore_index=True)
     # محاسبه طول زمانی برای هر subtask
@@ -165,7 +167,7 @@ def create_segments(tasks, subTasks):
 
 
 def exe_DAGFluid(tasks):
-    tasks = tasks.assign(HeavyOrLight='', SqqOrParal='' ,tetaij = 0 , Li_light = -1 , Ci_heavy = -1)
+    tasks = tasks.assign(HeavyOrLight='', SqqOrParal='', tetaij=0, Li_light=-1, Ci_heavy=-1)
 
     HOrL = []
     for _, task in tasks.iterrows():
@@ -174,31 +176,77 @@ def exe_DAGFluid(tasks):
         Sij = [int(p) for p in tasks.loc[tasks.TaskID == task.TaskID, 'Sij'].values[0].split(',') if
                p != '']
         HOrL = [0 if val <= task.alpha else 1 for val in Mij]
-        segments = [int(p) for p in tasks.loc[tasks.TaskID == task.TaskID, 'Segment'].values[0].split(',') if
-                        p != '']
         zero_count = HOrL.count(0)
         one_count = HOrL.count(1)
         result = ','.join(map(str, HOrL))
         tasks.at[task.TaskID, 'HeavyOrLight'] = result
         tasks.at[task.TaskID, 'SqqOrParal'] = 's' if task.U <= 1 else 'p'
+        # اگر تسک سکونشال بود نرخ اجرا میشود u
         tasks.at[task.TaskID, 'tetaij'] = task.U if task.U <= 1 else -1
         Li_light = -1
         Ci_heavy = -1
-        if(task.U >1):
+        # اینجا اگر یک تسک پارالل بود
+        if (task.U > 1):
             for i in range(len(HOrL)):
+                # اگر سگمنت لایت بود
                 if HOrL[i] == 0:
-                    Li_light+= Sij[i]
+                    Li_light += Sij[i]
                 else:
                     Ci_heavy += Mij[i] * Sij[i]
+            tasks.at[task.TaskID, 'Li_light'] = Li_light
+            tasks.at[task.TaskID, 'Ci_heavy'] = Ci_heavy
+
+            lst = ''
+            # اگر همه سگمنت ها سبک بود
+            if zero_count == len(HOrL):
+                # یک لیست به تعداد سگمنت ها همه نرخ اجرای یک میگیرد
+                lst = ','.join(map(str, ([1] * len(HOrL))))
+            # اگر همه سگمنت ها سنگین بود
+            elif one_count == len(HOrL):
+                # نرخ اجرای سگمنت ها وقتی همه سنگین باشند
+                for i in range(len(Mij)):
+                    lst += str((task.c / (task.T * Mij[i]))) + ','
+
+            # اگر سگمنت ها سبک و سنگین بود
+            else:
+                # اینجا هم در هر تسک میگیم سگمنت هاش چه وضعیتی دارن
+                for i in range(len(HOrL)):
+                    tmp = (M / (M + 1)) * task.L
+                    if Li_light <= tmp:
+                        if HOrL[i] == 0:
+                            lst += '1,'
+                        else:
+                            lst += str(Ci_heavy / (task.D - (M / (M + 1)) * float(task.L) ) * float(Mij[i])) + ','
+                    else:
+                        if HOrL[i] == 0:
+                            lst += '1,'
+                        else:
+                            if task.L <= ((M + 1) / M) * (task.D - ((1 / M) * task.c)):
+                                lst += str(Ci_heavy / (1 - (((M / (M + 1)) * task.L) / task.c)) * (
+                                            task.T - (M / (M + 1)) * task.L) * Mij[i]) + ','
+                            else:
+                                lst += str((task.L -Li_light)/(task.T - Li_light)) + ','
+
+            tasks.at[task.TaskID, 'tetaij'] = lst
+
+    # تست کل
+    tmp = sum(tasks.loc[tasks.SqqOrParal == 's' , 'U'])
+    max = -1
+    for _, task in tasks.iterrows():
+        if task.SqqOrParal == 'p':
+            Mij = [int(p) for p in tasks.loc[tasks.TaskID == task.TaskID, 'Mij'].values[0].split(',') if
+                   p != '']
+            teta = [float(p) for p in tasks.loc[tasks.TaskID == task.TaskID, 'tetaij'].values[0].split(',') if
+                   p != '']
+            for i in range(len(Mij)):
+                max = max if max< Mij[i] * teta[i] else  Mij[i] * teta[i]
+
+    test_result = max + tmp <=M
 
 
 
-        tasks.at[task.TaskID, 'Li_light'] = Li_light
-        tasks.at[task.TaskID, 'Ci_heavy'] = Ci_heavy
 
-
-
-    return tasks
+    return tasks , test_result
 
 
 def Namayesh_dag(SubTasks, Tasks):
@@ -242,9 +290,10 @@ tasks, subTasks = create_tasks(10)
 
 tasks = create_segments(tasks, subTasks)
 
-tasks = exe_DAGFluid(tasks)
+tasks , res = exe_DAGFluid(tasks)
 tasks.to_csv('tasks.csv')
 subTasks.to_csv('Subtasks.csv')
 
 print(tasks, "\n", subTasks)
+print('DAG-FLUID Result =====>' , res)
 Namayesh_dag(subTasks, tasks)
